@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+
+# Ignore local AI model weights
+medgemma-local/
+node_modules/
+.env
+dist/
+build/
+*.log

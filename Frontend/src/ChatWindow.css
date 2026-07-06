@@ -1,0 +1,461 @@
+.chatWindow {
+    background-color: var(--app-bg);
+    height: 100%;
+    width: 100%;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    overflow: hidden;
+}
+
+/* navbar */
+
+.navbar {
+    width: 100%;
+    flex: 0 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navStart {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+}
+
+.navbar span {
+    margin: 1rem 2rem;
+}
+
+.sidebarMenuBtn {
+    display: none;
+}
+
+.userIconDiv {
+    margin: 1rem 2rem;
+}
+
+.userIcon {
+    background-color: var(--accent);
+    height: 25px;
+    width: 25px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.userInitial { font-weight:700; color: white; }
+
+.userIcon i {
+    color: #fff;
+}
+
+/* chat input */
+.chatInput {
+    width: 100%;
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem 0 1rem;
+    gap: 0.5rem;
+}
+
+.modeSwitch {
+    display: flex;
+    gap: 0.5rem;
+    margin: 0 auto 0.45rem;
+    padding: 0.3rem;
+    border-radius: 999px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-subtle);
+}
+
+.modeOption {
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    padding: 0.5rem 0.9rem;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.modeOption.active {
+    background: var(--accent);
+    color: white;
+}
+
+.modeHint {
+    margin: 0 0 0.6rem;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+
+/* Update inputBox to adjust icon space */
+.inputBox {
+    width: calc(100% - 2rem);
+    position: relative;
+    max-width: 700px;
+    display: flex;
+    align-items: center;
+    background-color: var(--surface-soft);
+    border-radius: 14px;
+    box-shadow: rgba(0, 0, 0, 0.05) 0 5px 15px;
+    padding-left: 15px;
+}
+
+input {
+    width: 100%;
+    border: none;
+    background-color: var(--surface-soft);
+    padding: 20px;
+    font-size: 0.8rem;
+    border-radius: 14px;
+    box-shadow: rgba(0, 0, 0, 0.05) 0 54px 55px,
+                rgba(0, 0, 0, 0.05) 0 -12px 30px,
+                rgba(0, 0, 0, 0.05) 0 4px 6px,
+                rgba(0, 0, 0, 0.05) 0 12px 3px,
+                rgba(0, 0, 0, 0.05) 0 -3px 5px;
+}
+
+input:focus {
+    outline: none;
+}
+
+#submit {
+    cursor: pointer;
+    height: 35px;
+    width: 35px;
+    font-size: 20px;
+    position: absolute;
+    right: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#submit i:hover {
+    color: #fff;
+}
+
+
+
+/* Remove background and shadow from input since parent handles it now */
+.chatErrorMessage{
+    margin: 0.75rem auto;
+    padding: 0.9rem 1rem;
+    max-width: 700px;
+    background: rgba(248,113,113,0.12);
+    border: 1px solid rgba(248,113,113,0.35);
+    color: #fecaca;
+    border-radius: 14px;
+    text-align: left;
+}
+
+.appBrand {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.textInputField {
+    width: 100%;
+    border: none;
+    background-color: transparent;
+    padding: 20px 50px 20px 15px;
+    font-size: 0.9rem;
+    box-shadow: none;
+}
+
+.textInputField:focus {
+    outline: none;
+}
+
+/* Upload Icon Style */
+.uploadIcon {
+    font-size: 22px;
+    color: var(--text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.2s;
+}
+
+.uploadIcon:hover {
+    color: var(--text-primary);
+}
+
+/* Image Preview Card inside chat input */
+.inputImagePreview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: min(700px, calc(100% - 2rem));
+    max-width: 700px;
+    margin: 0 auto 0.9rem;
+    padding: 0.85rem 1rem;
+    gap: 0.9rem;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+}
+
+.imageThumb {
+    width: 72px;
+    height: 72px;
+    border-radius: 16px;
+    overflow: hidden;
+    flex-shrink: 0;
+    border: 1px solid rgba(255,255,255,0.12);
+}
+
+.imageThumb img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.imageDetails {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 0.25rem;
+    color: #e2e8f0;
+}
+
+.imageLabel {
+    font-weight: 600;
+}
+
+.imageHint {
+    font-size: 0.86rem;
+    color: #94a3b8;
+}
+
+.removeImageBtn {
+    background: rgba(248,113,113,0.95);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+}
+
+.removeImageBtn:hover {
+    background: #ef4444;
+}
+
+.inputBox {
+    width: calc(100% - 2rem);
+    position: relative;
+    max-width: 700px;
+    display: flex;
+    align-items: center;
+    background-color: var(--surface-soft);
+    border-radius: 14px;
+    box-shadow: rgba(0, 0, 0, 0.08) 0 14px 40px;
+    padding-left: 15px;
+}
+
+#submit {
+    cursor: pointer;
+    height: 38px;
+    width: 38px;
+    font-size: 20px;
+    position: absolute;
+    right: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text);
+}
+
+#submit i:hover {
+    color: #fff;
+}
+
+
+.info {
+    font-size: 0.8rem;
+    padding: 0.5rem;
+    color: var(--text-muted);
+}
+
+/* dropdown css */
+
+.dropDown {
+    position: fixed;
+    top: 4rem;
+    right: 4rem;
+    width: 190px;
+    background-color: var(--surface);
+    padding: 0.3rem 0.5rem;
+    border-radius: 6px;
+    text-align: left;
+    z-index: 1000;
+    box-shadow: 0px 2px 8px var(--shadow-soft);
+}
+
+@media (max-width: 900px) {
+    .navbar span,
+    .userIconDiv {
+        margin: 0.85rem 1rem;
+    }
+
+    .dropDown {
+        right: 1rem;
+    }
+}
+
+@media (max-width: 760px) {
+    .chatWindow {
+        flex: 1 1 auto;
+        height: 100%;
+        min-height: 0;
+    }
+
+    .sidebarMenuBtn {
+        width: 38px;
+        height: 38px;
+        display: inline-flex;
+        justify-content: center;
+        margin: 0.55rem 0 0.55rem 0.75rem;
+        padding: 0;
+        border-radius: 10px;
+        border-color: var(--border-subtle);
+    }
+
+    .navbar span,
+    .userIconDiv {
+        margin: 0.65rem 0.85rem;
+    }
+
+    .inputBox {
+        width: calc(100% - 1rem);
+        border-radius: 18px;
+        padding-left: 12px;
+    }
+
+    .textInputField {
+        padding: 16px 48px 16px 12px;
+        font-size: 0.95rem;
+    }
+
+    .info {
+        max-width: 92%;
+        font-size: 0.72rem;
+    }
+
+    .imagePreviewContainer {
+        bottom: 88px;
+    }
+
+    .dropDown {
+        top: 3.45rem;
+        right: 0.75rem;
+        width: min(220px, calc(100vw - 1.5rem));
+        border-radius: 14px;
+    }
+}
+
+@media (max-width: 420px) {
+    .textInputField {
+        padding: 14px 44px 14px 10px;
+    }
+
+    #submit {
+        right: 9px;
+        font-size: 18px;
+    }
+
+    .uploadIcon {
+        font-size: 19px;
+    }
+
+    .info {
+        line-height: 1.35;
+        padding: 0.4rem 0.5rem;
+    }
+}
+
+.dropDownItem {
+    font-size: 0.9rem;
+    margin: 0.3rem 0rem;
+    padding: 0.5rem 0.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.dropDownItem span {
+    margin: 0;
+}
+
+.dropDownItem:hover {
+    background-color: var(--surface-hover);
+    border-radius: 6px;
+}
+
+.themeOptions {
+    border-top: 1px solid var(--border-subtle);
+    border-bottom: 1px solid var(--border-subtle);
+    margin: 0.2rem 0 0.35rem;
+    padding: 0.25rem 0;
+}
+
+.themeOption {
+    width: 100%;
+    border: 0;
+    margin: 0.1rem 0;
+    padding: 0.45rem 0.35rem;
+    justify-content: flex-start;
+    gap: 0.45rem;
+    font-size: 0.84rem;
+}
+
+.themeOption:hover,
+.themeOption.selected {
+    background-color: var(--surface-hover);
+}
+
+.themeOption.selected::after {
+    content: "\f00c";
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    margin-left: auto;
+}
+
+.loader {
+    display: inline-block;
+    width: 34px;
+    height: 34px;
+    border: 4px solid rgba(255, 255, 255, 0.25);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

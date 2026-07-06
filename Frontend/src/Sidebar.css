@@ -1,0 +1,178 @@
+.sidebar {
+    background-color: var(--sidebar-bg);
+    color: var(--text-muted);
+    height: 100%;
+    width: 320px;
+    flex: 0 0 320px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    overflow: hidden;
+}
+
+
+button {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: transparent;
+    border: solid 0.5px var(--border-subtle);
+    cursor: pointer;
+}
+
+.logo {
+    height: 25px;
+    width: 25px;
+    background-color: #fff;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+button span {
+    font-size: 20px;
+}
+
+.brandBtn { display:flex; align-items:center; gap:10px }
+.brandBadge{ font-weight:700; font-size:1.05rem; padding:6px 10px; border-radius:8px; background:linear-gradient(90deg,#0ea5e9,#7c3aed); color:white }
+
+button:hover {
+    background-color: var(--surface-hover);
+}
+
+.history {
+    margin: 10px;
+    padding: 10px;
+    height: 100%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+}
+
+.history li {
+    list-style-type: none;
+    cursor: pointer;
+    padding: 2px 5px;
+    margin-bottom: 0.3rem;
+    font-size: 14px;
+    border: solid 10px transparent;
+    position: relative;
+    overflow-wrap: anywhere;
+}
+
+.history li:hover {
+    background-color: var(--surface-hover);
+    border-radius: 10px;
+}
+
+.sign {
+    padding: 10px;
+    margin: 10px;
+    font-size: 14px;
+    text-align: center;
+    border-top: solid 0.25px var(--border-subtle);
+}
+
+.fa-trash {
+    opacity: 0;
+    position: absolute;
+    right: 0;
+}
+
+.history li:hover .fa-trash {
+    opacity: 1;
+    color: var(--text-primary);
+}
+
+.fa-trash:hover {
+    color: #f87171 !important;
+}
+
+.highlighted {
+    background-color: var(--surface-hover);
+    border-radius: 10px;
+}
+
+@media (max-width: 900px) {
+    .sidebar {
+        width: 250px;
+        flex-basis: 250px;
+    }
+
+    .history li {
+        font-size: 13px;
+        border-width: 8px;
+    }
+}
+
+@media (max-width: 760px) {
+    .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: 900;
+        width: min(82vw, 300px);
+        height: 100dvh;
+        max-height: none;
+        flex: none;
+        border-right: 1px solid var(--border-subtle);
+        border-bottom: 0;
+        box-shadow: 18px 0 40px rgba(0, 0, 0, 0.28);
+        transform: translateX(-105%);
+        transition: transform 0.22s ease;
+    }
+
+    .sidebar.sidebarOpen {
+        transform: translateX(0);
+    }
+
+    .sidebar button {
+        width: calc(100% - 16px);
+        margin: 8px;
+        min-height: 42px;
+    }
+
+    .history {
+        display: block;
+        overflow-x: hidden;
+        overflow-y: auto;
+        height: 100%;
+        margin: 8px;
+        padding: 8px;
+    }
+
+    .history li {
+        min-width: 0;
+        max-width: none;
+        white-space: normal;
+        overflow: hidden;
+        text-overflow: clip;
+        border-width: 7px;
+        margin-bottom: 0.35rem;
+    }
+
+    .sign {
+        display: block;
+        margin: 8px;
+        padding: 8px;
+    }
+}
+
+@media (max-width: 420px) {
+    .sidebar {
+        width: min(86vw, 285px);
+    }
+
+    .sidebar button {
+        min-height: 38px;
+        padding: 8px;
+    }
+
+    .history li {
+        min-width: 145px;
+        max-width: 165px;
+        font-size: 12px;
+        border-width: 6px;
+    }
+}
