@@ -1,11 +1,18 @@
 import express from "express";
 import bcrypt from "bcrypt";
 import mongoose from "mongoose";
+import crypto from "crypto";
 import User from "../models/User.js";
 import { setSessionUser, requireAuth } from "../middleware/auth.js";
+import { authLimiter } from "../middleware/rateLimit.js";
+import { validate, signupSchema, loginSchema, upgradeSchema, webhookSchema } from "../middleware/validate.js";
 
 const router = express.Router();
 const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 3;
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 
 const requireDatabase = (res) => {
     if (mongoose.connection.readyState !== 1) {
@@ -18,22 +25,39 @@ const requireDatabase = (res) => {
     return true;
 };
 
+const isAdmin = (user) => (
+    user?.role === "admin" || ADMIN_EMAILS.includes((user?.email || "").toLowerCase())
+);
+
+const planChatAllowance = (plan) => {
+    if (plan === "cloud") return 9999;
+    if (plan === "premium") return 999999;
+    return 28;
+};
+
+const safeCompare = (provided, expected) => {
+    const providedBuffer = Buffer.from(String(provided || ""));
+    const expectedBuffer = Buffer.from(String(expected || ""));
+
+    if (providedBuffer.length !== expectedBuffer.length) {
+        return false;
+    }
+
+    return crypto.timingSafeEqual(providedBuffer, expectedBuffer);
+};
+
 // SIGNUP ROUTE
-router.post("/signup", async (req, res) => {
+router.post("/signup", authLimiter, validate(signupSchema), async (req, res, next) => {
     const { email, mobile, password } = req.body;
+
     try {
         if (!requireDatabase(res)) return;
 
-        if (!email || !mobile || !password) {
-            return res.status(400).json({ error: "Email, mobile and password are required" });
-        }
-
-        const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
+        const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(409).json({ error: "User already exists" });
         }
 
-        // Password hashing with salt (10 rounds)
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
 
@@ -52,27 +76,31 @@ router.post("/signup", async (req, res) => {
             user: safeUser
         });
     } catch (err) {
-        console.error("Signup failed:", err);
-        res.status(500).json({ error: "Error creating user" });
+        next(err);
     }
 });
 
 // LOGIN ROUTE
-router.post("/login", async (req, res) => {
+router.post("/login", authLimiter, validate(loginSchema), async (req, res, next) => {
     const { email, password } = req.body;
+
     try {
         if (!requireDatabase(res)) return;
 
-        if (!email || !password) {
-            return res.status(400).json({ error: "Email and password are required" });
+        const user = await User.findOne({ email });
+
+        // Deliberately identical response for unknown user and wrong password
+        // to avoid leaking which emails are registered.
+        const genericError = { error: "Invalid email or password" };
+
+        if (!user) {
+            return res.status(401).json(genericError);
         }
 
-        const user = await User.findOne({ email: email.toLowerCase().trim() });
-        if (!user) return res.status(404).json({ error: "User not found" });
-
-        // Compare given password with hashed password in DB
         const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(400).json({ error: "Invalid credentials" });
+        if (!isMatch) {
+            return res.status(401).json(genericError);
+        }
 
         const safeUser = setSessionUser(req, user);
         req.session.cookie.maxAge = SESSION_MAX_AGE;
@@ -82,8 +110,7 @@ router.post("/login", async (req, res) => {
             user: safeUser
         });
     } catch (err) {
-        console.error("Login failed:", err);
-        res.status(500).json({ error: "Server error" });
+        next(err);
     }
 });
 
@@ -117,29 +144,77 @@ router.post("/logout", (req, res) => {
     });
 });
 
-router.post("/upgrade", requireAuth, async (req, res) => {
-    const { plan } = req.body;
-    const validPlans = ["cloud", "premium"];
-    if (!validPlans.includes(plan)) {
-        return res.status(400).json({ error: "Invalid plan selected" });
+// Admin-only plan management. Normal users can no longer grant themselves a plan.
+// To bootstrap an admin, set `role: "admin"` on the user in MongoDB, or add the
+// user's email to ADMIN_EMAILS in the backend environment.
+router.post("/upgrade", requireAuth, validate(upgradeSchema), async (req, res, next) => {
+    if (!isAdmin(req.user)) {
+        return res.status(403).json({
+            error: "Upgrade requires an administrator or a verified payment."
+        });
     }
 
+    const { plan, userId } = req.body;
+
     try {
-        const user = await User.findById(req.user.id);
+        if (!requireDatabase(res)) return;
+
+        const targetId = userId || req.user.id;
+        const user = await User.findById(targetId);
         if (!user) {
             return res.status(404).json({ error: "User not found" });
         }
 
         user.plan = plan;
-        user.freeChatsRemaining = plan === "cloud" ? 9999 : 999999;
-        user.upgradedAt = new Date();
+        user.freeChatsRemaining = planChatAllowance(plan);
+        user.upgradedAt = plan === "free" ? null : new Date();
         await user.save();
 
-        const safeUser = setSessionUser(req, user);
-        res.json({ message: "Subscription updated", user: safeUser });
+        if (targetId === req.user.id) {
+            const safeUser = setSessionUser(req, user);
+            return res.json({ message: "Subscription updated", user: safeUser });
+        }
+
+        res.json({ message: "Subscription updated", userId: targetId, plan });
     } catch (err) {
-        console.error("Upgrade failed:", err);
-        res.status(500).json({ error: "Failed to update subscription" });
+        next(err);
+    }
+});
+
+// Stub payment webhook. A real payment provider must sign requests; this stub
+// only checks a shared secret and is a clearly marked TODO.
+router.post("/payment-webhook", validate(webhookSchema), async (req, res, next) => {
+    const configuredSecret = process.env.PAYMENT_WEBHOOK_SECRET;
+
+    if (!configuredSecret) {
+        return res.status(503).json({ error: "Payment webhook is not configured." });
+    }
+
+    if (!safeCompare(req.get("x-webhook-secret"), configuredSecret)) {
+        return res.status(401).json({ error: "Invalid webhook signature." });
+    }
+
+    try {
+        if (!requireDatabase(res)) return;
+
+        // TODO: verify the payment with the provider (signature, amount, status)
+        // before granting a plan. This stub trusts the caller after the shared
+        // secret check and must not be used in production as-is.
+        const { email, plan } = req.body;
+        const user = await User.findOne({ email });
+
+        if (!user) {
+            return res.status(404).json({ error: "User not found" });
+        }
+
+        user.plan = plan;
+        user.freeChatsRemaining = planChatAllowance(plan);
+        user.upgradedAt = plan === "free" ? null : new Date();
+        await user.save();
+
+        res.json({ ok: true, email, plan });
+    } catch (err) {
+        next(err);
     }
 });
 

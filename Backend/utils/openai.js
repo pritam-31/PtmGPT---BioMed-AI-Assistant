@@ -1,77 +1,107 @@
-import fetch from "node-fetch";
 import "dotenv/config";
+import { MEDICAL_SYSTEM_PROMPT } from "../prompts/medicalSystemPrompt.js";
 
-const getOpenAI_APIResponse = async (message, imageUrl = null) => {
-    if (!process.env.OPENAI_API_KEY) {
-        throw new Error("OPENAI_API_KEY is missing in .env");
+const API_URL = "https://api.openai.com/v1/chat/completions";
+
+// OpenAI Cookbook: https://platform.openai.com/docs/guides/gpt/lesson-1-multimodal
+// Vision input format: messages array with content parts of type "text" and "image_url"
+// (data URL). See https://platform.openai.com/docs/api-reference/vision
+
+// Verify the default model is available in your account before relying on it.
+// Model availability changes over time; see the OpenAI models documentation.
+// This default is unverified — confirm it matches your OpenAI plan.
+const getModel = () => process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+const buildUserContent = (message, fileBuffer, mimeType) => {
+    const text = (message || "").trim();
+
+    if (!fileBuffer) {
+        return text || "Hello";
     }
 
-    let prompt = message?.trim() || "";
-    if (imageUrl) {
-        const imagePrompt = message
-            ? `${message.trim()}\n\nPlease analyze the following image and explain any medical findings: ${imageUrl}`
-            : `Please analyze the following medical image and describe what you observe: ${imageUrl}`;
-        prompt = imagePrompt;
-    }
+    const dataUrl = `data:${mimeType || "image/jpeg"};base64,${fileBuffer.toString("base64")}`;
 
-    if (!prompt) {
-        prompt = "Please provide medical analysis for the uploaded image.";
-    }
-
-    const options = {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+    return [
+        {
+            type: "text",
+            text: text || "Please describe this medical image in general terms. Do not provide a definitive diagnosis."
         },
-        body: JSON.stringify({
-            model: "gpt-5.4-mini",
-            messages: [
-                {
-                    role: "user",
-                    content: prompt
-                }
-            ]
-        })
-    };
-
-    try {
-        const response = await fetch("https://api.openai.com/v1/chat/completions", options);
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error("OpenAI API returned non-ok status:", response.status, data);
-
-            // Provide a clearer message for quota/billing errors so the frontend can show it
-            if (response.status === 429 || data?.error?.type === "insufficient_quota") {
-                return "OpenAI quota exceeded: please check your OpenAI account plan and billing details.";
-            }
-
-            throw new Error(data.error?.message || "OpenAI API request failed");
+        {
+            type: "image_url",
+            image_url: { url: dataUrl }
         }
+    ];
+};
 
-        return data.choices?.[0]?.message?.content || "";
-    } catch (err) {
-        console.error("OpenAI request failed:", err);
-
-        if (err.message?.includes("OPENAI_API_KEY is missing")) {
-            return "OpenAI API key is not configured. Please add OPENAI_API_KEY to the backend .env file.";
-        }
-
-        if (imageUrl) {
-            return "I received your medical image, but the AI service is unavailable right now. Please configure your OpenAI API key in Backend/.env or try again later.";
-        }
-
-        if (!message?.trim()) {
-            return "I did not receive a prompt. Please ask your medical question again.";
-        }
-
-        if (/hi|hello|hey/i.test(message)) {
-            return "Hello! I'm your local assistant fallback. I can't access the AI service at the moment, but I can still help with basic guidance. Please configure your OpenAI API key for full responses.";
-        }
-
-        return "I'm currently unable to access the AI service. Please check your OpenAI API key and network connection, then try again.";
+/**
+ * Call the OpenAI Chat Completions API.
+ *
+ * @param {object} options
+ * @param {string} options.message user text
+ * @param {Buffer|null} options.fileBuffer optional image bytes
+ * @param {string|null} options.mimeType image mime type
+ * @param {Array<{role:string, content:string}>} options.history prior messages
+ * @param {string} options.systemPrompt safety system prompt
+ */
+const getOpenAI_APIResponse = async ({
+    message,
+    fileBuffer = null,
+    mimeType = null,
+    history = [],
+    systemPrompt = MEDICAL_SYSTEM_PROMPT
+} = {}) => {
+    if (!process.env.OPENAI_API_KEY) {
+        const error = new Error("Cloud mode is not configured. Set OPENAI_API_KEY in the backend environment.");
+        error.statusCode = 503;
+        throw error;
     }
+
+    const messages = [
+        { role: "system", content: systemPrompt },
+        ...history,
+        { role: "user", content: buildUserContent(message, fileBuffer, mimeType) }
+    ];
+
+    let response;
+    try {
+        response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+                model: getModel(),
+                messages
+            }),
+            signal: AbortSignal.timeout(60000)
+        });
+    } catch (err) {
+        const error = new Error("Could not reach the cloud AI provider. Check your network connection and try again.");
+        error.statusCode = 503;
+        error.cause = err;
+        throw error;
+    }
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+        const message = data?.error?.message || "Cloud AI request failed";
+        const error = new Error(message);
+        error.upstreamStatus = response.status;
+        error.statusCode = response.status === 429 ? 503 : 502;
+        throw error;
+    }
+
+    const reply = data.choices?.[0]?.message?.content;
+
+    if (typeof reply !== "string" || !reply.trim()) {
+        const error = new Error("Cloud AI returned an empty response");
+        error.statusCode = 502;
+        throw error;
+    }
+
+    return reply.trim();
 };
 
 export default getOpenAI_APIResponse;

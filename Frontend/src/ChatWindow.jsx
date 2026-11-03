@@ -1,7 +1,7 @@
 import "./ChatWindow.css";
 import Chat from "./Chat.jsx";
 import { MyContext } from "./MyContext.jsx";
-import { useContext, useState, useRef, useEffect } from "react";
+import { useContext, useState, useRef, useEffect, useMemo } from "react";
 import UpgradeModal from "./UpgradeModal.jsx";
 import "./UpgradeModal.css";
 
@@ -16,9 +16,63 @@ function ChatWindow({ onToggleSidebar }) {
     const [showThemeOptions, setShowThemeOptions] = useState(false);
     const [showUpgradeModal, setShowUpgradeModal] = useState(false);
     const [chatError, setChatError] = useState("");
-    const [userColor, setUserColor] = useState(null);
     const [selectedMode, setSelectedMode] = useState("openai");
-    
+    const userKey = authUser?.email || "";
+    const userColor = useMemo(() => {
+        if (!userKey) return null;
+        let hash = 0;
+        for (let i = 0; i < userKey.length; i += 1) {
+            hash = (hash * 31 + userKey.charCodeAt(i)) % 360;
+        }
+        return `hsl(${hash} 65% 50%)`;
+    }, [userKey]);
+    const [localStatus, setLocalStatus] = useState({ reachable: false, model_loaded: false, backend: "none" });
+    const [showConsent, setShowConsent] = useState(() => {
+        try {
+            return !localStorage.getItem("ptmgpt-consent-v1");
+        } catch {
+            return true;
+        }
+    });
+
+    const localAvailable = localStatus.reachable && localStatus.model_loaded;
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const checkLocal = async () => {
+            try {
+                const response = await fetch(`${apiBase}/api/ai/status`);
+                if (!response.ok) return;
+                const data = await response.json();
+                if (!cancelled && data?.local) {
+                    setLocalStatus(data.local);
+                }
+            } catch {
+                if (!cancelled) {
+                    setLocalStatus({ reachable: false, model_loaded: false, backend: "none" });
+                }
+            }
+        };
+
+        checkLocal();
+        const timer = setInterval(checkLocal, 15000);
+
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, [apiBase]);
+
+    const acceptConsent = () => {
+        try {
+            localStorage.setItem("ptmgpt-consent-v1", new Date().toISOString());
+        } catch {
+            // Ignore storage failures; the modal will simply show again next time.
+        }
+        setShowConsent(false);
+    };
+
     // Image Upload States
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
@@ -57,6 +111,11 @@ function ChatWindow({ onToggleSidebar }) {
         if (authUser.plan === "free" && authUser.freeChatsRemaining <= 0) {
             setChatError("Aapki free 28 chats khatam ho chuki hain. Upgrade karke aage baat karein.");
             setShowUpgradeModal(true);
+            return;
+        }
+
+        if (selectedMode === "biomed" && !localAvailable) {
+            setChatError("Local model is not available. Please use Cloud mode or start the local model (see docs/LOCAL_MODEL_SETUP.md).");
             return;
         }
 
@@ -136,21 +195,12 @@ function ChatWindow({ onToggleSidebar }) {
             });
         } catch(err) {
             console.log(err);
-            if (!chatError) {
-                setChatError(err.message || "Response failed. Please check backend and AI server.");
-            }
+            // Show failures as a system notice, never as an assistant message.
+            setChatError(err.message || "Response failed. Please check backend and AI server.");
             setPrompt(submittedPrompt);
             setImageFile(submittedImageFile);
             setImagePreview(submittedImagePreview);
             setReply(null);
-            setPrevChats(prevChats => [
-                ...prevChats,
-                {
-                    role: "assistant",
-                    content: err.message || "Response failed. Please check backend and AI server.",
-                    isError: true
-                }
-            ]);
         } finally {
             setLoading(false);
         }
@@ -160,16 +210,6 @@ function ChatWindow({ onToggleSidebar }) {
         setIsOpen(!isOpen);
         if (isOpen) setShowThemeOptions(false);
     }
-
-    useEffect(() => {
-        if (authUser) {
-            const hue = Math.floor(Math.random() * 360);
-            const color = `hsl(${hue} 65% 50%)`;
-            setUserColor(color);
-        } else {
-            setUserColor(null);
-        }
-    }, [authUser]);
 
     const handleThemeChange = (theme) => {
         setThemePreference(theme);
@@ -316,8 +356,10 @@ function ChatWindow({ onToggleSidebar }) {
                 </div>
                 <p className="modeHint">
                     {selectedMode === "biomed"
-                        ? "BioMed mode for medical questions."
-                        : "OpenAI mode for general questions and everyday chat."}
+                        ? (localAvailable
+                            ? "Local mode: your text and images are processed by the local model on this machine."
+                            : "Local model not available. Use Cloud mode or start the local model.")
+                        : "Cloud mode: your text and images are sent to a third-party provider (OpenAI)."}
                 </p>
                 <div className="inputBox">
                     <input 
@@ -351,9 +393,30 @@ function ChatWindow({ onToggleSidebar }) {
                 </div>
 
                 <p className="info">
-                    PtmGPT can make mistakes. Check important info. See Cookie Preferences.
+                    Research prototype. Not medical advice. Not a medical device. PtmGPT can make mistakes; check important information with a qualified clinician.
                 </p>
             </div>
+
+            {showConsent && (
+                <div className="authOverlay" role="dialog" aria-modal="true" aria-labelledby="consentTitle">
+                    <div className="authCard">
+                        <div className="authBadge">Before you continue</div>
+                        <h1 id="consentTitle">This is a research prototype</h1>
+                        <p className="authCopy">
+                            PtmGPT is not a medical device and does not provide medical advice, diagnosis, prescriptions, or dosages. It can make mistakes. Always consult a qualified clinician for personal medical decisions.
+                        </p>
+                        <p className="authCopy">
+                            <strong>Cloud mode</strong> sends your text and images to a third-party provider (OpenAI). <strong>Local mode</strong> sends them to the local model on this machine, but uploaded images may still be stored on Cloudinary if it is configured.
+                        </p>
+                        <p className="authCopy">
+                            In an emergency, contact your local emergency services immediately. In India, call 112.
+                        </p>
+                        <button className="authSubmit" type="button" onClick={acceptConsent}>
+                            I understand
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

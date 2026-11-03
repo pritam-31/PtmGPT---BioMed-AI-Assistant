@@ -1,0 +1,17 @@
+# Heavy dependencies needed ONLY for the Transformers backend
+# (LOCAL_BACKEND=transformers). Install these separately, ideally in a
+# dedicated environment, because they are large and hardware-specific.
+#
+#   pip install -r requirements.txt
+#   pip install -r requirements-model.txt
+#
+# For GPU installs, follow the official PyTorch selector:
+# https://pytorch.org/get-started/locally/
+#
+# NOTE: exact versions compatible with a given MedGemma checkpoint are
+# UNVERIFIED here. Check the model card before pinning versions.
+
+torch
+transformers
+accelerate
+sentencepiece

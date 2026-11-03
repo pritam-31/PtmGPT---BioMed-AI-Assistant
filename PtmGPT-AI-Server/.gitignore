@@ -1,10 +1,19 @@
 __pycache__/
 *.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
 
-# Ignore local AI model weights
-medgemma-local/
-node_modules/
+# Local configuration
 .env
-dist/
-build/
-*.log
+
+# Local AI model weights and caches (never commit these)
+models/
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+.cache/
+medgemma-local/

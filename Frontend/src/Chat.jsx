@@ -2,10 +2,6 @@ import "./Chat.css";
 import { useContext, useRef, useEffect } from "react";
 import { MyContext } from "./MyContext";
 
-function AssistantMessage({ content, isError }) {
-    return <div className={`assistantMessage ${isError ? "assistantError" : ""}`}>{content}</div>;
-}
-
 function Chat() {
     const {newChat, prevChats} = useContext(MyContext);
     const chatsContainerRef = useRef(null);
