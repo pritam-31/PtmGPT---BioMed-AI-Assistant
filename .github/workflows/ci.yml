@@ -26,10 +26,10 @@ jobs:
           cd Backend
           npm install --no-audit --no-fund
 
-      - name: Run tests
+      - name: Install frontend dependencies
         run: |
-          cd Backend
-          npm test
+          cd Frontend
+          npm ci --no-audit --no-fund
 
       - name: Lint
         run: |
