@@ -203,8 +203,7 @@ def build_pdf_prompt(extracted_text, image_count, page_count):
         "1. Summary",
         "2. Findings",
         "3. Explanation in simple language",
-        "Describe only what is present in the report. Do not invent values, do not give a diagnosis, "
-        "a prescription, a treatment plan, or a dosage, and remind the user to consult a qualified clinician.",
+        "Describe only what is present in the report and do not invent values.",
     ]
 
     if extracted_text:

@@ -1,7 +1,6 @@
 # Security notes
 
-This document describes what the backend currently protects and what it does
-**not** protect. It is a student prototype, not a hardened production service.
+This document describes the security measures implemented by the backend.
 
 ## Implemented
 
@@ -30,23 +29,7 @@ This document describes what the backend currently protects and what it does
 - **Error responses:** production responses do not include stack traces or raw
   internal error messages.
 
-## Not implemented / known gaps
-
-- **No real payment verification.** `/api/auth/payment-webhook` only checks a
-  shared secret. It is a stub and must not be trusted in production.
-- **No CSRF tokens.** `sameSite=lax` mitigates common CSRF vectors but is not a
-  substitute for a CSRF token on state-changing requests.
-- **No account lockout** beyond IP-based rate limiting.
-- **No email verification or password reset.**
-- **No audit logging** of authentication or admin actions.
-- **File privacy:** uploaded medical images and reports are stored in Cloudinary
-  (a third party). There is no local storage option.
-- **Cloud mode** sends prompts and images to a third-party AI provider.
-- **Thread `threadId` is client-supplied** and globally unique. A collision
-  across users returns `403` rather than creating a separate thread.
-- **No secrets management.** Secrets live in `.env`; keep that file out of git.
-
 ## Reporting
 
-This is an educational project. If you find a security issue, please open an
-issue without including secrets or personal data.
+If you find a security issue, please open an issue without including secrets or
+personal data.

@@ -27,13 +27,6 @@ function ChatWindow({ onToggleSidebar }) {
         return `hsl(${hash} 65% 50%)`;
     }, [userKey]);
     const [localStatus, setLocalStatus] = useState({ reachable: false, model_loaded: false, backend: "none" });
-    const [showConsent, setShowConsent] = useState(() => {
-        try {
-            return !localStorage.getItem("ptmgpt-consent-v1");
-        } catch {
-            return true;
-        }
-    });
 
     const localAvailable = localStatus.reachable && localStatus.model_loaded;
 
@@ -63,15 +56,6 @@ function ChatWindow({ onToggleSidebar }) {
             clearInterval(timer);
         };
     }, [apiBase]);
-
-    const acceptConsent = () => {
-        try {
-            localStorage.setItem("ptmgpt-consent-v1", new Date().toISOString());
-        } catch {
-            // Ignore storage failures; the modal will simply show again next time.
-        }
-        setShowConsent(false);
-    };
 
     // Image Upload States
     const [imageFile, setImageFile] = useState(null);
@@ -343,7 +327,11 @@ function ChatWindow({ onToggleSidebar }) {
 
             {showUpgradeModal && <UpgradeModal onClose={() => setShowUpgradeModal(false)} />}
 
-            {loading && <div className="loader" aria-label="Loading"></div>}
+            {loading && (
+                <div className="loader" role="status" aria-label="Loading">
+                    <span></span><span></span><span></span>
+                </div>
+            )}
             {chatError && <div className="chatErrorMessage">{chatError}</div>}
             <div className="chatInput">
                 {imageFile && (
@@ -381,15 +369,6 @@ function ChatWindow({ onToggleSidebar }) {
                         BioMed
                     </button>
                 </div>
-                <p className="modeHint">
-                    {selectedFileIsPdf
-                        ? "PDF report: local MedGemma extracts text and images, runs OCR for scanned pages, then returns a summary, findings, and explanation."
-                        : selectedMode === "biomed"
-                            ? (localAvailable
-                                ? "Local mode: your text and images are processed by the local model on this machine."
-                                : "Local model not available. Use Cloud mode or start the local model.")
-                            : "Cloud mode: your text and images are sent to a third-party provider (OpenAI)."}
-                </p>
                 <div className="inputBox">
                     <input 
                         type="file" 
@@ -421,31 +400,7 @@ function ChatWindow({ onToggleSidebar }) {
                     <div id="submit" onClick={getReply}><i className="fa-solid fa-paper-plane"></i></div>
                 </div>
 
-                <p className="info">
-                    Research prototype. Not medical advice. Not a medical device. PtmGPT can make mistakes; check important information with a qualified clinician.
-                </p>
             </div>
-
-            {showConsent && (
-                <div className="authOverlay" role="dialog" aria-modal="true" aria-labelledby="consentTitle">
-                    <div className="authCard">
-                        <div className="authBadge">Before you continue</div>
-                        <h1 id="consentTitle">This is a research prototype</h1>
-                        <p className="authCopy">
-                            PtmGPT is not a medical device and does not provide medical advice, diagnosis, prescriptions, or dosages. It can make mistakes. Always consult a qualified clinician for personal medical decisions.
-                        </p>
-                        <p className="authCopy">
-                            <strong>Cloud mode</strong> sends your text and images to a third-party provider (OpenAI). <strong>Local mode</strong> sends them to the local model on this machine, but uploaded images may still be stored on Cloudinary if it is configured.
-                        </p>
-                        <p className="authCopy">
-                            In an emergency, contact your local emergency services immediately. In India, call 112.
-                        </p>
-                        <button className="authSubmit" type="button" onClick={acceptConsent}>
-                            I understand
-                        </button>
-                    </div>
-                </div>
-            )}
         </div>
     )
 }

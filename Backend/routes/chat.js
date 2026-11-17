@@ -8,7 +8,6 @@ import { uploadFile } from "../utils/upload.js";
 import { requireAuth, setSessionUser } from "../middleware/auth.js";
 import { chatLimiter } from "../middleware/rateLimit.js";
 import { detectImageType, MAX_IMAGE_BYTES } from "../utils/imageValidation.js";
-import { isEmergencyMessage, EMERGENCY_MESSAGE } from "../utils/emergency.js";
 
 const router = express.Router();
 const upload = multer({
@@ -146,21 +145,6 @@ router.post("/chat", chatLimiter, upload.single("image"), async (req, res, next)
             });
         } else {
             thread.messages.push(userMessageData);
-        }
-
-        // Safety: never send a possible emergency to the model. Return a fixed
-        // message urging the user to contact emergency services instead.
-        if (isEmergencyMessage(message)) {
-            thread.messages.push({ role: "assistant", content: EMERGENCY_MESSAGE });
-            thread.updatedAt = new Date();
-            await thread.save();
-
-            return res.json({
-                reply: EMERGENCY_MESSAGE,
-                imageUrl: finalImageUrl,
-                user: req.session.user,
-                safety: "emergency"
-            });
         }
 
         const historyLimit = Number(process.env.OPENAI_HISTORY_MESSAGES) || 10;

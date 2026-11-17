@@ -1,13 +1,8 @@
 # PtmGPT — BioMed AI Assistant
 
-PtmGPT is a research prototype for a medical-themed chat assistant. It has a
+PtmGPT is a medical-themed chat assistant. It has a
 React frontend, a Node/Express bridge with MongoDB, and a Python FastAPI service
 that hosts a local medical vision-language model (MedGemma 4B).
-
-> **Not medical advice. Not a medical device.** This is an educational project.
-> It must not be used for diagnosis, treatment, prescriptions, dosage, or any
-> real clinical decision. In an emergency, contact local emergency services
-> (India: 112).
 
 ## What it does
 
@@ -68,9 +63,6 @@ PyMuPDF: extract text + embedded images per page
 | Input types | Text, images (PNG/JPEG/WebP), and PDF. Other formats are rejected. |
 | PDF analysis | Implemented: PyMuPDF extraction + OCR fallback + MedGemma, returning summary, findings, and explanation. |
 | Local mode (MedGemma) | Pipeline and model call implemented. **Model weights are not included**; install them yourself. Until then `/health` reports `model_loaded: false`. |
-| Payments / plans | **Not implemented.** Upgrade endpoints are admin-only stubs; no real payment processing. |
-| Medical safety | System prompt, disclaimers, emergency guard. |
-| RAG / citations | Not implemented. |
 | Tests / CI | See `Backend/tests` and `.github/workflows/ci.yml`. |
 
 ## Prerequisites
@@ -203,34 +195,6 @@ works but is slower; override the placement with `MEDGEMMA_DEVICE` (for example
 | `MAX_PDF_IMAGES` | No | Page images attached to the model (default `4`). |
 | `MAX_PDF_TEXT_CHARS` | No | Extracted text character limit (default `12000`). |
 | `MAX_NEW_TOKENS` | No | Model output limit (default `768`). |
-
-## Privacy — where your data goes
-
-| Data | Cloud mode (`openai`) | Local mode (`biomed`) |
-| --- | --- | --- |
-| Prompt text | Sent to OpenAI. | Sent to the local Python service only. |
-| Uploaded file | Stored in Cloudinary; images are sent to OpenAI. | Stored in Cloudinary; images and PDF reports are processed locally. |
-| Chat history | Stored in MongoDB. | Stored in MongoDB. |
-| Account data | Stored in MongoDB. | Stored in MongoDB. |
-
-Cloud mode is a third-party service, and Cloudinary is a third-party file host.
-Local mode does not send prompts or images to OpenAI, but chat history, account
-data, and uploaded files still leave the machine (MongoDB and Cloudinary).
-
-PDF reports are extracted and analyzed locally with MedGemma; the file itself is
-also stored in Cloudinary. OpenAI cloud mode is used for text and images only.
-
-## Known limitations
-
-- Not a medical device; outputs may be wrong or incomplete.
-- Local model quality, speed, and hardware requirements depend on the model and
-  backend you use.
-- Cloud vision support depends on the current OpenAI API; model ids change.
-- PDF analysis is limited to the first `MAX_PDF_PAGES` pages and
-  `MAX_PDF_IMAGES` images. Scanned PDFs need the Tesseract binary installed.
-- Handwriting and low-quality scans may produce weak OCR text.
-- No real payment integration.
-- No retrieval-augmented generation or clinical citations.
 
 ## License
 
