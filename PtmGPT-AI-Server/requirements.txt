@@ -1,6 +1,5 @@
-# Lightweight dependencies for the FastAPI service and its HTTP backends.
-# These are enough to run the server with LOCAL_BACKEND=none|ollama|llamacpp
-# and to run the test suite. They do NOT install PyTorch or Transformers.
+# Dependencies for the FastAPI service, PDF extraction, OCR, and HTTP backends.
+# These do NOT install PyTorch or Transformers.
 
 fastapi>=0.115
 uvicorn[standard]>=0.30
@@ -9,3 +8,10 @@ python-multipart>=0.0.9
 httpx>=0.27
 python-dotenv>=1.0
 pytest>=8.0
+
+# PDF text + image extraction
+pymupdf>=1.24
+
+# OCR for scanned PDFs. Also install the Tesseract binary:
+# https://github.com/tesseract-ocr/tesseract
+pytesseract>=0.3.10

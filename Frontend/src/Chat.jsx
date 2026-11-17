@@ -2,6 +2,11 @@ import "./Chat.css";
 import { useContext, useRef, useEffect } from "react";
 import { MyContext } from "./MyContext";
 
+const isImageUrl = (url) => (
+    typeof url === "string"
+    && (url.startsWith("blob:") || /\.(png|jpe?g|webp|gif|bmp|svg)(\?.*)?$/i.test(url))
+);
+
 function Chat() {
     const {newChat, prevChats} = useContext(MyContext);
     const chatsContainerRef = useRef(null);
@@ -27,7 +32,19 @@ function Chat() {
                             <div className={`messageBubble ${chat.role === "user" ? "userBubble" : "assistantBubble"}`}>
                                 {chat.imageUrl && (
                                     <div className="messageImageWrapper">
-                                        <img className="messageImage" src={chat.imageUrl} alt="Uploaded" />
+                                        {isImageUrl(chat.imageUrl) ? (
+                                            <img className="messageImage" src={chat.imageUrl} alt="Uploaded" />
+                                        ) : (
+                                            <a
+                                                className="messageFileLink"
+                                                href={chat.imageUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                            >
+                                                <i className="fa-solid fa-file-medical"></i>
+                                                View attachment
+                                            </a>
+                                        )}
                                     </div>
                                 )}
                                 {chat.content && <p className="messageText">{chat.content}</p>}

@@ -226,6 +226,16 @@ input:focus {
     object-fit: cover;
 }
 
+.imageThumb > i {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    font-size: 1.6rem;
+    color: #cbd5f5;
+    background: rgba(255,255,255,0.05);
+}
+
 .imageDetails {
     display: flex;
     flex-direction: column;

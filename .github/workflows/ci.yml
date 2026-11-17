@@ -8,7 +8,7 @@ on:
 
 jobs:
   test:
-    name: Backend Tests
+    name: Backend tests and frontend lint
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -21,17 +21,22 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
+      - name: Install backend dependencies
         run: |
           cd Backend
-          npm install --no-audit --no-fund
+          npm ci --no-audit --no-fund
+
+      - name: Run backend tests
+        run: |
+          cd Backend
+          npm test
 
       - name: Install frontend dependencies
         run: |
           cd Frontend
           npm ci --no-audit --no-fund
 
-      - name: Lint
+      - name: Lint frontend
         run: |
           cd Frontend
           npm run lint

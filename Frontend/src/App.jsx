@@ -259,7 +259,6 @@ function App() {
       </form>
     </div>
   );
-  const useFullPageAuthGate = false;
 
   if (authLoading) {
     return (
@@ -267,73 +266,6 @@ function App() {
         <div className="authCard loadingCard">
           <p>Checking your session...</p>
         </div>
-      </div>
-    );
-  }
-
-  if (useFullPageAuthGate && !authUser) {
-    return (
-      <div className="app authShell" data-theme={resolvedTheme}>
-        <form className="authCard" onSubmit={handleAuthSubmit}>
-          <div className="authBadge">PtmGPT</div>
-          <h1>{authMode === "login" ? "Welcome back" : "Create your account"}</h1>
-          <p className="authCopy">
-            Login once, stay signed in for 3 days of inactivity, and the session will end automatically when it expires.
-          </p>
-
-          <label>
-            Email
-            <input
-              type="email"
-              required
-              value={authForm.email}
-              onChange={(event) => handleAuthChange("email", event.target.value)}
-              placeholder="you@example.com"
-            />
-          </label>
-
-          {authMode === "signup" && (
-            <label>
-              Mobile
-              <input
-                type="tel"
-                required
-                value={authForm.mobile}
-                onChange={(event) => handleAuthChange("mobile", event.target.value)}
-                placeholder="9876543210"
-              />
-            </label>
-          )}
-
-          <label>
-            Password
-            <input
-              type="password"
-              required
-              minLength="6"
-              value={authForm.password}
-              onChange={(event) => handleAuthChange("password", event.target.value)}
-              placeholder="••••••••"
-            />
-          </label>
-
-          {authError && <p className="authError">{authError}</p>}
-
-          <button className="authSubmit" type="submit" disabled={authSubmitting}>
-            {authSubmitting ? "Please wait..." : authMode === "login" ? "Login" : "Sign up"}
-          </button>
-
-          <button
-            type="button"
-            className="authSwitch"
-            onClick={() => {
-              setAuthError("");
-              setAuthMode((prev) => (prev === "login" ? "signup" : "login"));
-            }}
-          >
-            {authMode === "login" ? "Need an account? Sign up" : "Already have an account? Login"}
-          </button>
-        </form>
       </div>
     );
   }

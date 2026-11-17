@@ -12,6 +12,6 @@
 # UNVERIFIED here. Check the model card before pinning versions.
 
 torch
-transformers
+transformers>=4.50
 accelerate
 sentencepiece

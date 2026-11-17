@@ -14,6 +14,10 @@ import { notFound, errorHandler } from "./middleware/errorHandler.js";
 
 const SESSION_MAX_AGE = 1000 * 60 * 60 * 24 * 3;
 const DB_URI = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/test";
+const INSECURE_SESSION_SECRETS = new Set([
+    "ptmgpt_session_secret_change_me",
+    "replace-with-a-long-random-string"
+]);
 
 const parseOrigins = () => (
     (process.env.FRONTEND_ORIGIN
@@ -29,12 +33,25 @@ const buildSessionStore = (isProduction) => {
     }
 
     try {
-        return MongoStore.create({
+        const store = MongoStore.create({
             mongoUrl: DB_URI,
             collectionName: "sessions",
             ttl: SESSION_MAX_AGE / 1000,
             autoRemove: "native"
         });
+
+        // connect-mongo connects lazily. If MongoDB is unreachable its internal
+        // promises reject, which would crash Node as an unhandled rejection.
+        // Handle both the "error" event and the internal connection promises.
+        const reportStoreError = (err) => {
+            console.error("MongoDB session store error:", err?.message || err);
+        };
+
+        store.on("error", reportStoreError);
+        store.clientP?.catch(reportStoreError);
+        store.collectionP?.catch(reportStoreError);
+
+        return store;
     } catch (err) {
         if (isProduction) {
             throw err;
@@ -50,8 +67,17 @@ export const createApp = () => {
     const isProduction = process.env.NODE_ENV === "production";
     const sessionSecret = process.env.SESSION_SECRET;
 
-    if (isProduction && (!sessionSecret || sessionSecret === "ptmgpt_session_secret_change_me")) {
-        throw new Error("SESSION_SECRET must be set to a strong value when NODE_ENV=production.");
+    if (
+        isProduction
+        && (
+            !sessionSecret
+            || sessionSecret.length < 32
+            || INSECURE_SESSION_SECRETS.has(sessionSecret)
+        )
+    ) {
+        throw new Error(
+            "SESSION_SECRET must be set to a strong value of at least 32 characters when NODE_ENV=production."
+        );
     }
 
     if (!sessionSecret) {

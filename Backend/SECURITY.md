@@ -20,9 +20,10 @@ This document describes what the backend currently protects and what it does
   on `/api/auth/login` and `/api/auth/signup`, and on chat.
 - **Security headers:** `helmet`.
 - **CORS:** restricted to the origins listed in `FRONTEND_ORIGIN`.
-- **Uploads:** Multer caps uploads at 5 MB, checks the declared mimetype against
-  an allowlist (PNG/JPEG/WebP), and the server also verifies the real file
-  signature (magic bytes) before using the image.
+- **Uploads:** Multer caps uploads at 20 MB and accepts images (PNG/JPEG/WebP) or
+  PDF reports only; other formats are rejected. Images are limited to 5 MB and
+  their real type is verified from magic bytes. All files are stored in
+  Cloudinary; there is no local disk fallback.
 - **Plans:** normal users can no longer grant themselves a paid plan. Plan
   changes require an admin (`role: "admin"` or an email in `ADMIN_EMAILS`) or
   the shared-secret payment webhook.
@@ -38,8 +39,8 @@ This document describes what the backend currently protects and what it does
 - **No account lockout** beyond IP-based rate limiting.
 - **No email verification or password reset.**
 - **No audit logging** of authentication or admin actions.
-- **Image privacy:** uploaded images may be sent to Cloudinary (a third party)
-  even in local BioMed mode unless Cloudinary is disabled.
+- **File privacy:** uploaded medical images and reports are stored in Cloudinary
+  (a third party). There is no local storage option.
 - **Cloud mode** sends prompts and images to a third-party AI provider.
 - **Thread `threadId` is client-supplied** and globally unique. A collision
   across users returns `403` rather than creating a separate thread.

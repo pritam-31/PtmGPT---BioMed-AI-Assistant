@@ -77,6 +77,9 @@ function ChatWindow({ onToggleSidebar }) {
     const [imageFile, setImageFile] = useState(null);
     const [imagePreview, setImagePreview] = useState(null);
     const fileInputRef = useRef(null);
+    const selectedFileIsPdf = Boolean(
+        imageFile && (imageFile.type === "application/pdf" || /\.pdf$/i.test(imageFile.name))
+    );
 
     // Handle Image Selection
     const handleImageChange = (e) => {
@@ -87,10 +90,23 @@ function ChatWindow({ onToggleSidebar }) {
         }
 
         const file = e.target.files[0];
-        if (file) {
-            setImageFile(file);
-            setImagePreview(URL.createObjectURL(file));
+        if (!file) return;
+
+        const isPdf = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+
+        if (isPdf) {
+            if (!localAvailable) {
+                setChatError("PDF analysis needs the local MedGemma model. Start the Python AI server and try again.");
+                if (fileInputRef.current) fileInputRef.current.value = "";
+                return;
+            }
+
+            setSelectedMode("biomed");
         }
+
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImageFile(file);
+        setImagePreview(file.type.startsWith("image/") ? URL.createObjectURL(file) : null);
     };
 
     const removeImage = () => {
@@ -114,8 +130,13 @@ function ChatWindow({ onToggleSidebar }) {
             return;
         }
 
+        if (selectedFileIsPdf && !localAvailable) {
+            setChatError("PDF analysis needs the local MedGemma model. Start the Python AI server and try again.");
+            return;
+        }
+
         if (selectedMode === "biomed" && !localAvailable) {
-            setChatError("Local model is not available. Please use Cloud mode or start the local model (see docs/LOCAL_MODEL_SETUP.md).");
+            setChatError('Local (BioMed) model is not running. Start the Python AI server (see "Local model setup (MedGemma 4B)" in README.md) or switch to Cloud mode.');
             return;
         }
 
@@ -124,7 +145,9 @@ function ChatWindow({ onToggleSidebar }) {
         const submittedImageFile = imageFile;
         const userMessage = {
             role: "user",
-            content: submittedPrompt || "Uploaded Image",
+            content: submittedPrompt || (
+                submittedImageFile?.type.startsWith("image/") ? "Uploaded Image" : "Uploaded Report"
+            ),
             imageUrl: submittedImagePreview
         };
 
@@ -138,7 +161,7 @@ function ChatWindow({ onToggleSidebar }) {
         formData.append("threadId", currThreadId);
         formData.append("mode", selectedMode);
         if (submittedPrompt) formData.append("message", submittedPrompt);
-        if (imageFile) formData.append("image", imageFile);
+        if (submittedImageFile) formData.append("image", submittedImageFile);
 
         // Clear UI inputs immediately for good UX
         setPrompt("");
@@ -194,7 +217,7 @@ function ChatWindow({ onToggleSidebar }) {
                 }];
             });
         } catch(err) {
-            console.log(err);
+            console.error(err);
             // Show failures as a system notice, never as an assistant message.
             setChatError(err.message || "Response failed. Please check backend and AI server.");
             setPrompt(submittedPrompt);
@@ -323,13 +346,17 @@ function ChatWindow({ onToggleSidebar }) {
             {loading && <div className="loader" aria-label="Loading"></div>}
             {chatError && <div className="chatErrorMessage">{chatError}</div>}
             <div className="chatInput">
-                {imagePreview && (
+                {imageFile && (
                     <div className="inputImagePreview">
                         <div className="imageThumb">
-                            <img src={imagePreview} alt="Preview" />
+                            {imagePreview ? (
+                                <img src={imagePreview} alt="Preview" />
+                            ) : (
+                                <i className="fa-solid fa-file-medical"></i>
+                            )}
                         </div>
                         <div className="imageDetails">
-                            <div className="imageLabel">Image attached</div>
+                            <div className="imageLabel">{imagePreview ? "Image attached" : imageFile.name}</div>
                             <div className="imageHint">Upload will appear in chat when sent.</div>
                         </div>
                         <button className="removeImageBtn" onClick={removeImage}>
@@ -355,16 +382,18 @@ function ChatWindow({ onToggleSidebar }) {
                     </button>
                 </div>
                 <p className="modeHint">
-                    {selectedMode === "biomed"
-                        ? (localAvailable
-                            ? "Local mode: your text and images are processed by the local model on this machine."
-                            : "Local model not available. Use Cloud mode or start the local model.")
-                        : "Cloud mode: your text and images are sent to a third-party provider (OpenAI)."}
+                    {selectedFileIsPdf
+                        ? "PDF report: local MedGemma extracts text and images, runs OCR for scanned pages, then returns a summary, findings, and explanation."
+                        : selectedMode === "biomed"
+                            ? (localAvailable
+                                ? "Local mode: your text and images are processed by the local model on this machine."
+                                : "Local model not available. Use Cloud mode or start the local model.")
+                            : "Cloud mode: your text and images are sent to a third-party provider (OpenAI)."}
                 </p>
                 <div className="inputBox">
                     <input 
                         type="file" 
-                        accept="image/*" 
+                        accept="image/png,image/jpeg,image/webp,application/pdf,.pdf"
                         hidden 
                         ref={fileInputRef} 
                         onChange={handleImageChange} 

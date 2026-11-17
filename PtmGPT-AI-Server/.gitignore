@@ -7,9 +7,11 @@ venv/
 
 # Local configuration
 .env
+.env.example
 
 # Local AI model weights and caches (never commit these)
 models/
+model/
 *.gguf
 *.safetensors
 *.bin

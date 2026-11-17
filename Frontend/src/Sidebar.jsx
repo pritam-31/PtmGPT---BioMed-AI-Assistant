@@ -27,7 +27,7 @@ function Sidebar({ isOpen = false, onNavigate }) {
             const filteredData = res.map(thread => ({threadId: thread.threadId, title: thread.title}));
             setAllThreads(filteredData);
         } catch(err) {
-            console.log(err);
+            console.error(err);
         }
     }, [apiBase, authUser, handleSessionExpired, setAllThreads]);
 
@@ -66,7 +66,7 @@ function Sidebar({ isOpen = false, onNavigate }) {
             setReply(null);
             onNavigate?.();
         } catch(err) {
-            console.log(err);
+            console.error(err);
         }
     }   
 
@@ -93,7 +93,7 @@ function Sidebar({ isOpen = false, onNavigate }) {
             }
 
         } catch(err) {
-            console.log(err);
+            console.error(err);
         }
     }
 

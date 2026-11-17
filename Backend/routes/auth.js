@@ -17,7 +17,9 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "")
 const requireDatabase = (res) => {
     if (mongoose.connection.readyState !== 1) {
         res.status(503).json({
-            error: "Database is not connected. Check MongoDB Atlas Network Access/IP whitelist."
+            error: process.env.MONGODB_URI
+                ? "Database is not connected. Check MongoDB Atlas Network Access/IP whitelist."
+                : "Database is not connected. MONGODB_URI is not set in Backend/.env, so the app is using a local MongoDB fallback that is not running."
         });
         return false;
     }
@@ -76,6 +78,10 @@ router.post("/signup", authLimiter, validate(signupSchema), async (req, res, nex
             user: safeUser
         });
     } catch (err) {
+        if (err?.code === 11000) {
+            return res.status(409).json({ error: "User already exists" });
+        }
+
         next(err);
     }
 });
@@ -160,6 +166,11 @@ router.post("/upgrade", requireAuth, validate(upgradeSchema), async (req, res, n
         if (!requireDatabase(res)) return;
 
         const targetId = userId || req.user.id;
+
+        if (!mongoose.isValidObjectId(targetId)) {
+            return res.status(400).json({ error: "Invalid user id" });
+        }
+
         const user = await User.findById(targetId);
         if (!user) {
             return res.status(404).json({ error: "User not found" });

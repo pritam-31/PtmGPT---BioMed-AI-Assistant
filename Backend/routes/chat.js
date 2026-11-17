@@ -4,26 +4,24 @@ import multer from "multer";
 import Thread from "../models/Thread.js";
 import User from "../models/User.js";
 import getLocalMedicalResponse from "../utils/local_ai.js";
-import { uploadImage } from "../utils/upload.js";
+import { uploadFile } from "../utils/upload.js";
 import { requireAuth, setSessionUser } from "../middleware/auth.js";
 import { chatLimiter } from "../middleware/rateLimit.js";
-import { ALLOWED_IMAGE_MIME_TYPES, validateImageBuffer } from "../utils/imageValidation.js";
+import { detectImageType, MAX_IMAGE_BYTES } from "../utils/imageValidation.js";
 import { isEmergencyMessage, EMERGENCY_MESSAGE } from "../utils/emergency.js";
 
 const router = express.Router();
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 5 * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-        if (!ALLOWED_IMAGE_MIME_TYPES.includes(file.mimetype)) {
-            const error = new Error("Unsupported image. Upload a PNG, JPEG, or WebP file.");
-            error.statusCode = 422;
-            return cb(error);
-        }
-
-        cb(null, true);
-    }
+    limits: { fileSize: 20 * 1024 * 1024 }
 });
+
+const PDF_SIGNATURE = Buffer.from("%PDF-", "ascii");
+const isPdfBuffer = (buffer) => (
+    Buffer.isBuffer(buffer)
+    && buffer.length >= PDF_SIGNATURE.length
+    && buffer.subarray(0, PDF_SIGNATURE.length).equals(PDF_SIGNATURE)
+);
 
 router.use(requireAuth);
 
@@ -84,13 +82,29 @@ router.post("/chat", chatLimiter, upload.single("image"), async (req, res, next)
     }
 
     try {
-        if (file) {
-            const imageCheck = validateImageBuffer(file.buffer);
-            if (!imageCheck.ok) {
-                return res.status(imageCheck.status).json({ error: imageCheck.error });
-            }
-            file.mimetype = imageCheck.mimeType;
+        const detectedImageType = file ? detectImageType(file.buffer) : null;
+        const fileIsImage = Boolean(detectedImageType);
+        const fileIsPdf = Boolean(file && !fileIsImage && isPdfBuffer(file.buffer));
+
+        if (file && !fileIsImage && !fileIsPdf) {
+            return res.status(422).json({
+                error: "Unsupported file. Upload an image (PNG, JPEG, WebP) or a PDF report."
+            });
         }
+
+        if (fileIsImage) {
+            if (file.buffer.length > MAX_IMAGE_BYTES) {
+                return res.status(413).json({ error: "Image is too large. Maximum size is 5 MB." });
+            }
+            file.mimetype = detectedImageType;
+        }
+
+        if (fileIsPdf) {
+            file.mimetype = "application/pdf";
+        }
+
+        // PDF reports are analyzed by the local MedGemma pipeline.
+        const effectiveMode = fileIsPdf ? "biomed" : selectedMode;
 
         const dbUser = await User.findById(req.user.id);
         if (!dbUser) {
@@ -101,23 +115,25 @@ router.post("/chat", chatLimiter, upload.single("image"), async (req, res, next)
             return res.status(402).json({ error: "Free chat limit exceeded. Please upgrade." });
         }
 
-        let finalImageUrl = null;
-
-        // Save the image for UI display (Cloudinary or local /uploads).
-        if (file) {
-            const uploadResult = await uploadImage(file.buffer, file.originalname, file.mimetype);
-            finalImageUrl = uploadResult.url;
-        }
-
+        // Check thread ownership before uploading anything so a user cannot
+        // push files into storage for a thread they do not own.
         let thread = await Thread.findOne({ threadId });
 
         if (thread && thread.ownerId.toString() !== req.user.id) {
             return res.status(403).json({ error: "Not authorized to access this thread" });
         }
 
+        let finalImageUrl = null;
+
+        // Store the uploaded medical image or report in Cloudinary for UI display.
+        if (file) {
+            const uploadResult = await uploadFile(file.buffer, file.originalname);
+            finalImageUrl = uploadResult.url;
+        }
+
         const userMessageData = {
             role: "user",
-            content: message || "Medical image uploaded",
+            content: message || (fileIsPdf ? "Medical report uploaded" : "Medical image uploaded"),
             imageUrl: finalImageUrl
         };
 
@@ -155,11 +171,12 @@ router.post("/chat", chatLimiter, upload.single("image"), async (req, res, next)
 
         const assistantReply = await getLocalMedicalResponse(
             message,
-            file ? file.buffer : null,
-            file ? file.originalname : null,
-            file?.mimetype,
-            selectedMode,
-            history
+            (fileIsImage || fileIsPdf) ? file.buffer : null,
+            (fileIsImage || fileIsPdf) ? file.originalname : null,
+            fileIsImage ? file.mimetype : fileIsPdf ? "application/pdf" : undefined,
+            effectiveMode,
+            history,
+            fileIsPdf ? "pdf" : fileIsImage ? "image" : null
         );
 
         if (!assistantReply) {
