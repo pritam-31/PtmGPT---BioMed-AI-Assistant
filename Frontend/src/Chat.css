@@ -33,12 +33,12 @@
 .messageBubble {
     max-width: 640px;
     border-radius: 22px;
-    padding: 1rem 1.1rem;
+    padding: 0.8rem 0.95rem;
     position: relative;
     text-align: left;
     display: inline-flex;
     flex-direction: column;
-    gap: 0.75rem;
+    gap: 0.5rem;
     word-break: break-word;
 }
 
@@ -60,8 +60,8 @@
     margin: 0;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    line-height: 1.7;
-    font-size: 0.95rem;
+    line-height: 1.55;
+    font-size: 0.9rem;
 }
 
 .messageImageWrapper {
@@ -95,6 +95,18 @@
     text-decoration: underline;
 }
 
+.messageActionButton .icon {
+    display: block;
+    width: 13px;
+    height: 13px;
+}
+
+.messageFileLink .icon {
+    display: block;
+    width: 15px;
+    height: 15px;
+}
+
 .assistantError {
     color: #ff9b9b;
     border-left: 3px solid #ff6b6b;
@@ -123,6 +135,156 @@
 
 pre {
     white-space: pre-wrap;
+}
+
+.messageActions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.3rem;
+    margin-top: 0.15rem;
+    opacity: 0.55;
+    transition: opacity 0.18s ease;
+}
+
+.messageRow:hover .messageActions,
+.messageRow:focus-within .messageActions {
+    opacity: 1;
+}
+
+.assistantRow .messageActions {
+    justify-content: flex-start;
+}
+
+.messageActionButton {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font-size: 0.68rem;
+    opacity: 0.85;
+    cursor: pointer;
+    transition: background 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+
+.messageActionButton:hover:not(:disabled) {
+    background: var(--surface-hover);
+    opacity: 1;
+    transform: translateY(-1px);
+}
+
+.messageActionButton::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%) translateY(4px);
+    padding: 0.2rem 0.45rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font-size: 0.66rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    z-index: 5;
+}
+
+.messageActionButton:hover::after,
+.messageActionButton:focus-visible::after {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.copiedBadge {
+    color: #6ee7a8;
+    font-size: 0.68rem;
+    font-weight: 600;
+    margin-left: 0.15rem;
+}
+
+.messageActionButton:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.messageActionButton.danger:hover:not(:disabled) {
+    color: #ff9b9b;
+}
+
+.messageActionButton.save:hover:not(:disabled) {
+    color: #6ee7a8;
+}
+
+.messageEdit {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    width: 100%;
+    min-width: min(260px, 60vw);
+}
+
+.messageEditInput {
+    width: 100%;
+    min-height: 56px;
+    max-height: 180px;
+    resize: vertical;
+    padding: 0.5rem 0.6rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.messageEditInput:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.messageEditActions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.15rem;
+}
+
+.messageEdited {
+    font-size: 0.7rem;
+    font-style: italic;
+    opacity: 0.6;
+}
+
+.messageStatus {
+    max-width: 520px;
+    margin: 0.5rem auto;
+    padding: 0.45rem 0.8rem;
+    border-radius: 8px;
+    background: var(--surface-soft);
+    color: var(--text-muted);
+    font-size: 0.78rem;
+}
+
+.messageActionError {
+    max-width: 520px;
+    margin: 0.5rem auto;
+    padding: 0.45rem 0.8rem;
+    border-radius: 8px;
+    background: rgba(255, 107, 107, 0.12);
+    color: #ff9b9b;
+    font-size: 0.78rem;
 }
 
 @media (max-width: 760px) {

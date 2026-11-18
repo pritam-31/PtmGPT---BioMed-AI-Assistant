@@ -1,6 +1,7 @@
 // Backend/routes/chat.js
 import express from "express";
 import multer from "multer";
+import mongoose from "mongoose";
 import Thread from "../models/Thread.js";
 import User from "../models/User.js";
 import getLocalMedicalResponse from "../utils/local_ai.js";
@@ -21,6 +22,60 @@ const isPdfBuffer = (buffer) => (
     && buffer.length >= PDF_SIGNATURE.length
     && buffer.subarray(0, PDF_SIGNATURE.length).equals(PDF_SIGNATURE)
 );
+
+const fetchAttachment = async (url) => {
+    if (!url || !/^https?:\/\//i.test(url)) return null;
+
+    try {
+        const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+        if (!response.ok) return null;
+
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const mimeType = detectImageType(buffer);
+
+        if (mimeType) {
+            return { buffer, mimeType, fileKind: "image" };
+        }
+        if (isPdfBuffer(buffer)) {
+            return { buffer, mimeType: "application/pdf", fileKind: "pdf" };
+        }
+        return null;
+    } catch {
+        return null;
+    }
+};
+
+const buildReply = async (thread, userIndex, content, modeOverride) => {
+    const mode = modeOverride || (thread.messages[userIndex].mode === "openai" ? "openai" : "biomed");
+    const attachment = await fetchAttachment(thread.messages[userIndex].imageUrl);
+    const historyLimit = Number(process.env.OPENAI_HISTORY_MESSAGES) || 10;
+    const history = thread.messages
+        .slice(0, userIndex + 1)
+        .map((entry, index) => ({
+            role: entry.role,
+            content: index === userIndex ? content : entry.content
+        }))
+        .slice(0, -1)
+        .slice(-historyLimit);
+
+    const reply = await getLocalMedicalResponse(
+        content,
+        attachment?.buffer || null,
+        attachment ? "attachment" : null,
+        attachment?.mimeType,
+        mode,
+        history,
+        attachment?.fileKind || null
+    );
+
+    if (!reply) {
+        const error = new Error("AI server returned an empty response");
+        error.statusCode = 502;
+        throw error;
+    }
+
+    return { reply, mode };
+};
 
 router.use(requireAuth);
 
@@ -66,6 +121,199 @@ router.delete("/thread/:threadId", async (req, res, next) => {
         }
 
         res.json({ success: true });
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.patch("/thread/:threadId/message/:messageId", async (req, res, next) => {
+    try {
+        const { content } = req.body;
+
+        if (typeof content !== "string" || !content.trim()) {
+            return res.status(400).json({ error: "Message content is required" });
+        }
+
+        if (content.length > 20000) {
+            return res.status(400).json({ error: "Message is too long" });
+        }
+
+        if (!mongoose.Types.ObjectId.isValid(req.params.messageId)) {
+            return res.status(400).json({ error: "Invalid message id" });
+        }
+
+        const thread = await Thread.findOne({ threadId: req.params.threadId });
+
+        if (!thread) {
+            return res.status(404).json({ error: "thread not found" });
+        }
+
+        if (thread.ownerId.toString() !== req.user.id) {
+            return res.status(403).json({ error: "Not authorized to access this thread" });
+        }
+
+        const messageIndex = thread.messages.findIndex(
+            (entry) => entry._id.toString() === req.params.messageId
+        );
+
+        if (messageIndex === -1) {
+            return res.status(404).json({ error: "message not found" });
+        }
+
+        const message = thread.messages[messageIndex];
+        const nextContent = content.trim();
+
+        if (message.role !== "user") {
+            message.content = nextContent;
+            message.editedAt = new Date();
+            thread.updatedAt = new Date();
+            await thread.save();
+            return res.json({ success: true, messages: thread.messages, message });
+        }
+
+        const { reply: assistantReply, mode } = await buildReply(thread, messageIndex, nextContent);
+
+        message.content = nextContent;
+        message.editedAt = new Date();
+        thread.messages = thread.messages.slice(0, messageIndex + 1);
+        thread.messages.push({
+            _id: new mongoose.Types.ObjectId(),
+            role: "assistant",
+            content: assistantReply,
+            mode
+        });
+        thread.updatedAt = new Date();
+        await thread.save();
+
+        res.json({
+            success: true,
+            messages: thread.messages,
+            message,
+            reply: assistantReply,
+            assistantMessageId: thread.messages[thread.messages.length - 1]._id
+        });
+    } catch (err) {
+        if (err.statusCode) {
+            if (err.statusCode >= 500) console.error("Message regeneration failed:", err.message);
+            return res.status(err.statusCode).json({ error: err.message });
+        }
+        next(err);
+    }
+});
+
+router.post("/thread/:threadId/message/:messageId/retry", async (req, res, next) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.messageId)) {
+            return res.status(400).json({ error: "Invalid message id" });
+        }
+
+        const thread = await Thread.findOne({ threadId: req.params.threadId });
+
+        if (!thread) {
+            return res.status(404).json({ error: "thread not found" });
+        }
+
+        if (thread.ownerId.toString() !== req.user.id) {
+            return res.status(403).json({ error: "Not authorized to access this thread" });
+        }
+
+        const messageIndex = thread.messages.findIndex(
+            (entry) => entry._id.toString() === req.params.messageId
+        );
+
+        if (messageIndex === -1) {
+            return res.status(404).json({ error: "message not found" });
+        }
+
+        let userIndex = messageIndex;
+
+        if (thread.messages[messageIndex].role !== "user") {
+            userIndex = -1;
+
+            for (let index = messageIndex - 1; index >= 0; index -= 1) {
+                if (thread.messages[index].role === "user") {
+                    userIndex = index;
+                    break;
+                }
+            }
+
+            if (userIndex === -1) {
+                return res.status(400).json({ error: "No user message to retry" });
+            }
+        }
+
+        const { reply, mode } = await buildReply(
+            thread,
+            userIndex,
+            thread.messages[userIndex].content
+        );
+
+        const assistantMessage = {
+            _id: thread.messages[messageIndex].role === "assistant"
+                ? thread.messages[messageIndex]._id
+                : new mongoose.Types.ObjectId(),
+            role: "assistant",
+            content: reply,
+            mode
+        };
+
+        thread.messages = thread.messages.slice(0, userIndex + 1);
+        thread.messages.push(assistantMessage);
+        thread.updatedAt = new Date();
+        await thread.save();
+
+        res.json({
+            success: true,
+            messages: thread.messages,
+            reply,
+            assistantMessageId: assistantMessage._id
+        });
+    } catch (err) {
+        if (err.statusCode) {
+            if (err.statusCode >= 500) console.error("Message retry failed:", err.message);
+            return res.status(err.statusCode).json({ error: err.message });
+        }
+        next(err);
+    }
+});
+
+router.delete("/thread/:threadId/message/:messageId", async (req, res, next) => {
+    try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.messageId)) {
+            return res.status(400).json({ error: "Invalid message id" });
+        }
+
+        const thread = await Thread.findOne({ threadId: req.params.threadId });
+
+        if (!thread) {
+            return res.status(404).json({ error: "thread not found" });
+        }
+
+        if (thread.ownerId.toString() !== req.user.id) {
+            return res.status(403).json({ error: "Not authorized to access this thread" });
+        }
+
+        const messageIndex = thread.messages.findIndex(
+            (entry) => entry._id.toString() === req.params.messageId
+        );
+
+        if (messageIndex === -1) {
+            return res.status(404).json({ error: "message not found" });
+        }
+
+        const deletedMessageIds = [req.params.messageId];
+        const nextMessage = thread.messages[messageIndex + 1];
+
+        if (thread.messages[messageIndex].role === "user" && nextMessage?.role === "assistant") {
+            deletedMessageIds.push(nextMessage._id.toString());
+            thread.messages.splice(messageIndex + 1, 1);
+        }
+
+        thread.messages.splice(messageIndex, 1);
+        thread.updatedAt = new Date();
+        await thread.save();
+
+        res.json({ success: true, messages: thread.messages, deletedMessageIds });
     } catch (err) {
         next(err);
     }
@@ -133,7 +381,8 @@ router.post("/chat", chatLimiter, upload.single("image"), async (req, res, next)
         const userMessageData = {
             role: "user",
             content: message || (fileIsPdf ? "Medical report uploaded" : "Medical image uploaded"),
-            imageUrl: finalImageUrl
+            imageUrl: finalImageUrl,
+            mode: effectiveMode
         };
 
         if (!thread) {
@@ -146,6 +395,8 @@ router.post("/chat", chatLimiter, upload.single("image"), async (req, res, next)
         } else {
             thread.messages.push(userMessageData);
         }
+
+        const userMessageDoc = thread.messages[thread.messages.length - 1];
 
         const historyLimit = Number(process.env.OPENAI_HISTORY_MESSAGES) || 10;
         const history = thread.messages
@@ -169,7 +420,8 @@ router.post("/chat", chatLimiter, upload.single("image"), async (req, res, next)
             throw error;
         }
 
-        thread.messages.push({ role: "assistant", content: assistantReply });
+        thread.messages.push({ role: "assistant", content: assistantReply, mode: effectiveMode });
+        const assistantMessageDoc = thread.messages[thread.messages.length - 1];
         thread.updatedAt = new Date();
 
         await thread.save();
@@ -180,7 +432,13 @@ router.post("/chat", chatLimiter, upload.single("image"), async (req, res, next)
             setSessionUser(req, dbUser);
         }
 
-        res.json({ reply: assistantReply, imageUrl: finalImageUrl, user: req.session.user });
+        res.json({
+            reply: assistantReply,
+            imageUrl: finalImageUrl,
+            user: req.session.user,
+            userMessageId: userMessageDoc._id,
+            assistantMessageId: assistantMessageDoc._id
+        });
     } catch (err) {
         if (err.statusCode && err.statusCode < 500) {
             return res.status(err.statusCode).json({ error: err.message });

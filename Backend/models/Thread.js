@@ -17,6 +17,15 @@ const MessageSchema = new mongoose.Schema({
     timestamp: {
         type: Date,
         default: Date.now
+    },
+    editedAt: {
+        type: Date,
+        default: null
+    },
+    mode: {
+        type: String,
+        enum: ["openai", "biomed"],
+        default: "biomed"
     }
 });
 

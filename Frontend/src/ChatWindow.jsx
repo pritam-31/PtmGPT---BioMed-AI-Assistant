@@ -128,6 +128,7 @@ function ChatWindow({ onToggleSidebar }) {
         const submittedImagePreview = imagePreview;
         const submittedImageFile = imageFile;
         const userMessage = {
+            localId: crypto.randomUUID(),
             role: "user",
             content: submittedPrompt || (
                 submittedImageFile?.type.startsWith("image/") ? "Uploaded Image" : "Uploaded Report"
@@ -185,25 +186,23 @@ function ChatWindow({ onToggleSidebar }) {
             setChatError("");
             setReply(res.reply);
             setPrevChats(prevChats => {
-                const updatedChats = [...prevChats];
-                const lastUserIndex = updatedChats.findLastIndex(chat => chat.role === "user");
-
-                if (lastUserIndex !== -1) {
-                    updatedChats[lastUserIndex] = {
-                        ...updatedChats[lastUserIndex],
-                        imageUrl: finalImageUrl
-                    };
-                }
+                const updatedChats = prevChats.map(chat => (
+                    chat.localId === userMessage.localId
+                        ? { ...chat, imageUrl: finalImageUrl, _id: res.userMessageId }
+                        : chat
+                ));
 
                 return [...updatedChats, {
                     role: "assistant",
-                    content: res.reply
+                    content: res.reply,
+                    _id: res.assistantMessageId
                 }];
             });
         } catch(err) {
             console.error(err);
             // Show failures as a system notice, never as an assistant message.
             setChatError(err.message || "Response failed. Please check backend and AI server.");
+            setPrevChats(chats => chats.filter(chat => chat.localId !== userMessage.localId));
             setPrompt(submittedPrompt);
             setImageFile(submittedImageFile);
             setImagePreview(submittedImagePreview);
