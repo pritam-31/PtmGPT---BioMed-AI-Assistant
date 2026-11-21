@@ -6,6 +6,7 @@ that hosts a local medical vision-language model (MedGemma 4B).
 
 ## What it does
 
+
 - Chat in two modes:
   - **Cloud mode** — text and images are sent to OpenAI (requires `OPENAI_API_KEY`).
   - **Local mode (BioMed)** — text, images, and PDF reports are processed by
